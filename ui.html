@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Finance Dashboard — API Tester</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e4e4e0;
+    --border-strong: #c8c8c2;
+    --text: #1a1a18;
+    --muted: #6b6b65;
+    --accent: #1a1a18;
+    --green: #166534; --green-bg: #dcfce7;
+    --red: #991b1b; --red-bg: #fee2e2;
+    --blue: #1e40af; --blue-bg: #dbeafe;
+    --amber: #92400e; --amber-bg: #fef3c7;
+    --pink: #9d174d; --pink-bg: #fce7f3;
+    --mono: 'Courier New', monospace;
+  }
+
+  body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .layout { display: grid; grid-template-columns: 240px 1fr 340px; height: 100vh; overflow: hidden; }
+
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; }
+  .sidebar-head { padding: 20px 16px 12px; border-bottom: 1px solid var(--border); }
+  .sidebar-head h1 { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .sidebar-head p { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: sans-serif; }
+
+  .uid-bar { margin: 12px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-family: sans-serif; }
+  .uid-bar label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 4px; }
+  .uid-val { font-family: var(--mono); font-size: 10px; color: var(--text); word-break: break-all; line-height: 1.4; }
+  .uid-actions { display: flex; gap: 6px; margin-top: 6px; }
+  .uid-actions button { font-size: 10px; padding: 3px 8px; border: 1px solid var(--border); background: var(--surface); border-radius: 4px; cursor: pointer; font-family: sans-serif; }
+  .uid-actions button:hover { background: var(--bg); }
+
+  .nav-group { padding: 8px 0; }
+  .nav-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; padding: 6px 16px 4px; font-family: sans-serif; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 7px 16px; cursor: pointer; font-family: sans-serif; font-size: 12px; color: var(--muted); transition: all 0.1s; border-left: 2px solid transparent; }
+  .nav-item:hover { background: var(--bg); color: var(--text); }
+  .nav-item.active { background: var(--bg); color: var(--text); border-left-color: var(--text); font-weight: 500; }
+  .badge { font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 3px; font-family: var(--mono); letter-spacing: 0; }
+  .GET    { background: var(--green-bg); color: var(--green); }
+  .POST   { background: var(--blue-bg);  color: var(--blue); }
+  .PUT    { background: var(--amber-bg); color: var(--amber); }
+  .DELETE { background: var(--red-bg);   color: var(--red); }
+  .PATCH  { background: var(--pink-bg);  color: var(--pink); }
+
+  .main { overflow-y: auto; padding: 28px 32px; display: flex; flex-direction: column; gap: 20px; }
+
+  .panel { display: none; flex-direction: column; gap: 16px; }
+  .panel.active { display: flex; }
+
+  .panel-title { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+  .panel-hint { font-size: 12px; color: var(--muted); font-family: sans-serif; line-height: 1.5; }
+
+  .url-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  .url-method { font-family: var(--mono); font-size: 11px; font-weight: 700; }
+  .url-text { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .fields { display: flex; flex-direction: column; gap: 10px; }
+  .field { display: flex; align-items: center; gap: 12px; }
+  .field label { font-size: 12px; color: var(--muted); min-width: 88px; font-family: sans-serif; }
+  .field input, .field select { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: sans-serif; background: var(--surface); color: var(--text); }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--border-strong); }
+
+  .send-btn { align-self: flex-start; padding: 9px 22px; background: var(--text); color: white; border: none; border-radius: 8px; font-size: 13px; font-family: sans-serif; cursor: pointer; letter-spacing: 0.01em; transition: opacity 0.1s; }
+  .send-btn:hover { opacity: 0.8; }
+
+  .right-panel { border-left: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; overflow: hidden; }
+  .right-head { padding: 20px 16px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .right-head h2 { font-size: 13px; font-weight: 600; }
+  .status-chip { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; font-family: var(--mono); display: none; }
+  .s2xx { display: inline-block; background: var(--green-bg); color: var(--green); }
+  .s4xx { display: inline-block; background: var(--red-bg); color: var(--red); }
+  .s5xx { display: inline-block; background: var(--amber-bg); color: var(--amber); }
+  .s0   { display: inline-block; background: #f1f1ef; color: var(--muted); }
+
+  .response-body { flex: 1; overflow-y: auto; padding: 14px 16px; font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: pre-wrap; word-break: break-word; line-height: 1.6; }
+  .response-placeholder { color: var(--muted); font-family: sans-serif; font-size: 12px; padding: 32px 16px; text-align: center; line-height: 1.6; }
+
+  .log-section { border-top: 1px solid var(--border); max-height: 200px; overflow-y: auto; }
+  .log-head { padding: 8px 16px; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-family: sans-serif; border-bottom: 1px solid var(--border); background: var(--bg); position: sticky; top: 0; }
+  .log-entry { display: flex; align-items: center; gap: 8px; padding: 5px 16px; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 10px; }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-path { color: var(--text); flex: 1; }
+  .log-ok   { color: var(--green); }
+  .log-err  { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-head">
+      <h1>Finance Dashboard</h1>
+      <p>API tester — localhost:5000</p>
+    </div>
+
+    <div class="uid-bar">
+      <label>active user id</label>
+      <div class="uid-val" id="uid-display">—</div>
+      <div class="uid-actions">
+        <button onclick="copyUID()">copy</button>
+        <button onclick="clearUID()">clear</button>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Users</div>
+      <div class="nav-item active" data-panel="create-user"><span class="badge POST">POST</span>/users</div>
+      <div class="nav-item" data-panel="list-users"><span class="badge GET">GET</span>/users</div>
+      <div class="nav-item" data-panel="update-status"><span class="badge PATCH">PATCH</span>/users/:id/status</div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Records</div>
+      <div class="nav-item" data-panel="create-record"><span class="badge POST">POST</span>/records</div>
+      <div class="nav-item" data-panel="list-records"><span class="badge GET">GET</span>/records</div>
+      <div class="nav-item" data-panel="update-record"><span class="badge PUT">PUT</span>/records/:id</div>
+      <div class="nav-item" data-panel="delete-record"><span class="badge DELETE">DEL</span>/records/:id</div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Dashboard</div>
+      <div class="nav-item" data-panel="summary"><span class="badge GET">GET</span>/dashboard/summary</div>
+      <div class="nav-item" data-panel="trends"><span class="badge GET">GET</span>/dashboard/trends</div>
+    </div>
+  </div>
+
+  <!-- MAIN PANELS -->
+  <div class="main">
+
+    <div id="panel-create-user" class="panel active">
+      <div class="panel-title">Create User</div>
+      <div class="panel-hint">Creates a new user. The returned id is saved automatically and sent as <code>X-User-Id</code> in all future requests.</div>
+      <div class="fields">
+        <div class="field"><label>name</label><input id="cu-name" placeholder="e.g. Alice" /></div>
+        <div class="field"><label>role</label>
+          <select id="cu-role"><option value="admin">admin</option><option value="analyst">analyst</option><option value="viewer">viewer</option></select>
+        </div>
+      </div>
+      <div class="url-row"><span class="url-method POST" style="color:#1e40af">POST</span><span class="url-text">http://127.0.0.1:5000/users</span></div>
+      <button class="send-btn" onclick="run('create-user')">Send Request</button>
+    </div>
+
+    <div id="panel-list-users" class="panel">
+      <div class="panel-title">List Users</div>
+      <div class="panel-hint">Returns all users. Requires <strong>admin</strong> role.</div>
+      <div class="url-row"><span class="url-method" style="color:#166534">GET</span><span class="url-text">http://127.0.0.1:5000/users</span></div>
+      <button class="send-btn" onclick="run('list-users')">Send Request</button>
+    </div>
+
+    <div id="panel-update-status" class="panel">
+      <div class="panel-title">Update User Status</div>
+      <div class="panel-hint">Activate or deactivate a user. Requires <strong>admin</strong>.</div>
+      <div class="fields">
+        <div class="field"><label>user id</label><input id="us-id" placeholder="paste user id" /></div>
+        <div class="field"><label>status</label>
+          <select id="us-status"><option value="inactive">inactive</option><option value="active">active</option></select>
+        </div>
+      </div>
+      <div class="url-row"><span class="url-method" style="color:#9d174d">PATCH</span><span class="url-text">http://127.0.0.1:5000/users/{id}/status</span></div>
+      <button class="send-btn" onclick="run('update-status')">Send Request</button>
+    </div>
+
+    <div id="panel-create-record" class="panel">
+      <div class="panel-title">Create Record</div>
+      <div class="panel-hint">Add a financial entry. Requires <strong>admin</strong>.</div>
+      <div class="fields">
+        <div class="field"><label>amount</label><input id="cr-amount" type="number" placeholder="e.g. 1500" /></div>
+        <div class="field"><label>type</label>
+          <select id="cr-type"><option value="income">income</option><option value="expense">expense</option></select>
+        </div>
+        <div class="field"><label>category</label><input id="cr-category" placeholder="e.g. salary, rent, food" /></div>
+        <div class="field"><label>date</label><input id="cr-date" type="date" /></div>
+        <div class="field"><label>notes</label><input id="cr-notes" placeholder="optional" /></div>
+      </div>
+      <div class="url-row"><span class="url-method" style="color:#1e40af">POST</span><span class="url-text">http://127.0.0.1:5000/records</span></div>
+      <button class="send-btn" onclick="run('create-record')">Send Request</button>
+    </div>
+
+    <div id="panel-list-records" class="panel">
+      <div class="panel-title">List Records</div>
+      <div class="panel-hint">All roles can view records. Use the filters below to narrow results.</div>
+      <div class="fields">
+        <div class="field"><label>type</label>
+          <select id="lr-type"><option value="">— all —</option><option value="income">income</option><option value="expense">expense</option></select>
+        </div>
+        <div class="field"><label>category</label><input id="lr-category" placeholder="leave blank for all" /></div>
+        <div class="field"><label>date</label><input id="lr-date" type="date" /></div>
+      </div>
+      <div class="url-row"><span class="url-method" style="color:#166534">GET</span><span class="url-text" id="lr-url">http://127.0.0.1:5000/records</span></div>
+      <button class="send-btn" onclick="run('list-records')">Send Request</button>
+    </div>
+
+    <div id="panel-update-record" class="panel">
+      <div class="panel-title">Update Record</div>
+      <div class="panel-hint">Only include the fields you want to change. Requires <strong>admin</strong>.</div>
+      <div class="fields">
+        <div class="field"><label>record id</label><input id="ur-id" placeholder="paste record id" /></div>
+        <div class="field"><label>amount</label><input id="ur-amount" type="number" placeholder="optional" /></div>
+        <div class="field"><label>type</label>
+          <select id="ur-type"><option value="">— no change —</option><option value="income">income</option><option value="expense">expense</option></select>
+        </div>
+        <div class="field"><label>category</label><input id="ur-category" placeholder="optional" /></div>
+        <div class="field"><label>notes</label><input id="ur-notes" placeholder="optional" /></div>
+      </div>
+      <div class="url-row"><span class="url-method" style="color:#92400e">PUT</span><span class="url-text">http://127.0.0.1:5000/records/{id}</span></div>
+      <button class="send-btn" onclick="run('update-record')">Send Request</button>
+    </div>
+
+    <div id="panel-delete-record" class="panel">
+      <div class="panel-title">Delete Record</div>
+      <div class="panel-hint">Soft delete — marks the record as deleted, data is not lost. Requires <strong>admin</strong>.</div>
+      <div class="fields">
+        <div class="field"><label>record id</label><input id="dr-id" placeholder="paste record id" /></div>
+      </div>
+      <div class="url-row"><span class="url-method" style="color:#991b1b">DELETE</span><span class="url-text">http://127.0.0.1:5000/records/{id}</span></div>
+      <button class="send-btn" onclick="run('delete-record')">Send Request</button>
+    </div>
+
+    <div id="panel-summary" class="panel">
+      <div class="panel-title">Dashboard Summary</div>
+      <div class="panel-hint">Returns total income, total expenses, net balance, category totals, and last 5 records. All roles.</div>
+      <div class="url-row"><span class="url-method" style="color:#166534">GET</span><span class="url-text">http://127.0.0.1:5000/dashboard/summary</span></div>
+      <button class="send-btn" onclick="run('summary')">Send Request</button>
+    </div>
+
+    <div id="panel-trends" class="panel">
+      <div class="panel-title">Monthly Trends</div>
+      <div class="panel-hint">Month-by-month income vs expense breakdown. Requires <strong>analyst</strong> or <strong>admin</strong>.</div>
+      <div class="url-row"><span class="url-method" style="color:#166534">GET</span><span class="url-text">http://127.0.0.1:5000/dashboard/trends</span></div>
+      <button class="send-btn" onclick="run('trends')">Send Request</button>
+    </div>
+
+  </div>
+
+  <!-- RIGHT PANEL: Response + Log -->
+  <div class="right-panel">
+    <div class="right-head">
+      <h2>Response</h2>
+      <span class="status-chip" id="status-chip"></span>
+    </div>
+    <div id="response-body" class="response-body">
+      <div class="response-placeholder">Hit "Send Request" to see the response here.<br><br>Make sure <code>python app.py</code> is running on port 5000.</div>
+    </div>
+
+    <div class="log-section">
+      <div class="log-head">Request Log</div>
+      <div id="log-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const BASE = 'http://127.0.0.1:5000';
+let activeUID = null;
+let logs = [];
+
+document.querySelectorAll('.nav-item[data-panel]').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('panel-' + el.dataset.panel).classList.add('active');
+  });
+});
+
+function setUID(id) {
+  activeUID = id;
+  document.getElementById('uid-display').textContent = id;
+}
+function clearUID() {
+  activeUID = null;
+  document.getElementById('uid-display').textContent = '—';
+}
+function copyUID() {
+  if (activeUID) navigator.clipboard.writeText(activeUID);
+}
+
+function showResponse(status, data) {
+  const chip = document.getElementById('status-chip');
+  chip.textContent = status || 'ERR';
+  chip.className = 'status-chip';
+  if (!status) chip.classList.add('s0');
+  else if (status >= 500) chip.classList.add('s5xx');
+  else if (status >= 400) chip.classList.add('s4xx');
+  else chip.classList.add('s2xx');
+  document.getElementById('response-body').textContent = JSON.stringify(data, null, 2);
+}
+
+function addLog(method, path, status, ok) {
+  const t = new Date().toLocaleTimeString('en-US', { hour12: false });
+  logs.unshift({ t, method, path, status, ok });
+  const el = document.getElementById('log-list');
+  el.innerHTML = logs.slice(0, 40).map(e =>
+    `<div class="log-entry">
+      <span class="log-time">${e.t}</span>
+      <span class="badge ${e.method}" style="flex-shrink:0">${e.method}</span>
+      <span class="log-path">${e.path}</span>
+      <span class="${e.ok ? 'log-ok' : 'log-err'}">${e.status}</span>
+    </div>`
+  ).join('');
+}
+
+async function run(key) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (activeUID) headers['X-User-Id'] = activeUID;
+
+  let method = 'GET', url = BASE, body, logPath = '';
+
+  try {
+    if (key === 'create-user') {
+      const name = document.getElementById('cu-name').value.trim();
+      if (!name) return showResponse(400, { error: 'name is required' });
+      method = 'POST'; url = `${BASE}/users`; logPath = '/users';
+      body = JSON.stringify({ name, role: document.getElementById('cu-role').value });
+
+    } else if (key === 'list-users') {
+      url = `${BASE}/users`; logPath = '/users';
+
+    } else if (key === 'update-status') {
+      const id = document.getElementById('us-id').value.trim();
+      if (!id) return showResponse(400, { error: 'user id is required' });
+      method = 'PATCH'; url = `${BASE}/users/${id}/status`; logPath = '/users/…/status';
+      body = JSON.stringify({ status: document.getElementById('us-status').value });
+
+    } else if (key === 'create-record') {
+      const amount = document.getElementById('cr-amount').value;
+      const category = document.getElementById('cr-category').value.trim();
+      if (!amount || !category) return showResponse(400, { error: 'amount and category are required' });
+      method = 'POST'; url = `${BASE}/records`; logPath = '/records';
+      const p = { amount: parseFloat(amount), type: document.getElementById('cr-type').value, category };
+      const d = document.getElementById('cr-date').value;
+      const n = document.getElementById('cr-notes').value;
+      if (d) p.date = d;
+      if (n) p.notes = n;
+      body = JSON.stringify(p);
+
+    } else if (key === 'list-records') {
+      const params = new URLSearchParams();
+      const t = document.getElementById('lr-type').value;
+      const c = document.getElementById('lr-category').value.trim();
+      const d = document.getElementById('lr-date').value;
+      if (t) params.set('type', t);
+      if (c) params.set('category', c);
+      if (d) params.set('date', d);
+      const q = params.toString();
+      url = `${BASE}/records${q ? '?' + q : ''}`;
+      logPath = `/records${q ? '?' + q : ''}`;
+      document.getElementById('lr-url').textContent = `http://127.0.0.1:5000${url.replace(BASE,'')}`;
+
+    } else if (key === 'update-record') {
+      const id = document.getElementById('ur-id').value.trim();
+      if (!id) return showResponse(400, { error: 'record id is required' });
+      method = 'PUT'; url = `${BASE}/records/${id}`; logPath = '/records/…';
+      const p = {};
+      const a = document.getElementById('ur-amount').value;
+      const t = document.getElementById('ur-type').value;
+      const c = document.getElementById('ur-category').value.trim();
+      const n = document.getElementById('ur-notes').value.trim();
+      if (a) p.amount = parseFloat(a);
+      if (t) p.type = t;
+      if (c) p.category = c;
+      if (n) p.notes = n;
+      if (!Object.keys(p).length) return showResponse(400, { error: 'no fields to update' });
+      body = JSON.stringify(p);
+
+    } else if (key === 'delete-record') {
+      const id = document.getElementById('dr-id').value.trim();
+      if (!id) return showResponse(400, { error: 'record id is required' });
+      method = 'DELETE'; url = `${BASE}/records/${id}`; logPath = '/records/…';
+
+    } else if (key === 'summary') {
+      url = `${BASE}/dashboard/summary`; logPath = '/dashboard/summary';
+
+    } else if (key === 'trends') {
+      url = `${BASE}/dashboard/trends`; logPath = '/dashboard/trends';
+    }
+
+    showResponse('...', { status: 'sending…' });
+    const opts = { method, headers };
+    if (body) opts.body = body;
+    const res = await fetch(url, opts);
+    const data = await res.json();
+    showResponse(res.status, data);
+    addLog(method, logPath, res.status, res.ok);
+
+    if (key === 'create-user' && res.ok && data.id) {
+      setUID(data.id);
+    }
+
+  } catch (e) {
+    const msg = (e.message || '').includes('fetch') || (e.message || '').includes('Failed')
+      ? 'Could not reach server. Make sure python app.py is running on port 5000.'
+      : e.message;
+    showResponse(null, { error: msg });
+    addLog(method, logPath, 'ERR', false);
+  }
+}
+</script>
+</body>
+</html>

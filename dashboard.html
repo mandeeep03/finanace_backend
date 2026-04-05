@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Finance Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f7f7f5; --surface: #ffffff; --border: #e4e4e0;
+    --text: #1a1a18; --muted: #6b6b65;
+    --green: #166534; --green-bg: #dcfce7; --green-mid: #16a34a;
+    --red: #991b1b; --red-bg: #fee2e2; --red-mid: #dc2626;
+    --blue: #1e40af; --blue-bg: #dbeafe;
+    --amber: #92400e; --amber-bg: #fef3c7;
+  }
+  body { font-family: 'Georgia', serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .uid-input-wrap { display: flex; align-items: center; gap: 6px; }
+  .uid-input-wrap label { font-size: 11px; color: var(--muted); font-family: sans-serif; }
+  .uid-input-wrap input { font-family: monospace; font-size: 11px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; width: 260px; background: var(--bg); }
+  .refresh-btn { padding: 7px 16px; background: var(--text); color: white; border: none; border-radius: 7px; font-size: 12px; font-family: sans-serif; cursor: pointer; }
+  .refresh-btn:hover { opacity: 0.8; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
+  .status-dot.online { background: var(--green-mid); }
+
+  .content { padding: 28px 32px; display: flex; flex-direction: column; gap: 24px; max-width: 1200px; }
+
+  .error-bar { background: var(--red-bg); border: 1px solid #fca5a5; border-radius: 8px; padding: 10px 16px; font-size: 12px; font-family: sans-serif; color: var(--red); display: none; }
+
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .metric-label { font-size: 11px; color: var(--muted); font-family: sans-serif; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .metric-value { font-size: 26px; font-weight: 600; letter-spacing: -0.03em; }
+  .metric-value.positive { color: var(--green-mid); }
+  .metric-value.negative { color: var(--red-mid); }
+  .metric-value.neutral  { color: var(--text); }
+
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .chart-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 16px; font-family: sans-serif; }
+  .chart-wrap { position: relative; height: 220px; }
+
+  .bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .table-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 14px; font-family: sans-serif; }
+  table { width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 12px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 8px 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  .pill { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .pill.income  { background: var(--green-bg); color: var(--green); }
+  .pill.expense { background: var(--red-bg); color: var(--red); }
+
+  .empty { color: var(--muted); font-size: 12px; font-family: sans-serif; padding: 20px 0; text-align: center; }
+
+  .loading { color: var(--muted); font-size: 13px; font-family: sans-serif; padding: 60px 0; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Finance Dashboard</h1>
+  <div class="header-right">
+    <div class="uid-input-wrap">
+      <label>User ID</label>
+      <input id="uid-input" placeholder="paste your X-User-Id here" />
+    </div>
+    <div class="status-dot" id="status-dot"></div>
+    <button class="refresh-btn" onclick="loadAll()">Refresh</button>
+  </div>
+</header>
+
+<div class="content">
+
+  <div class="error-bar" id="error-bar"></div>
+
+  <div class="metrics" id="metrics">
+    <div class="loading">Enter your user id and click Refresh to load data.</div>
+  </div>
+
+  <div class="charts-row" id="charts-row" style="display:none">
+    <div class="chart-card">
+      <h3>Monthly Trends</h3>
+      <div class="chart-wrap"><canvas id="trends-chart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Spending by Category</h3>
+      <div class="chart-wrap"><canvas id="category-chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="bottom-row" id="bottom-row" style="display:none">
+    <div class="table-card">
+      <h3>Recent Activity</h3>
+      <table id="recent-table">
+        <thead><tr><th>Date</th><th>Category</th><th>Type</th><th>Amount</th></tr></thead>
+        <tbody id="recent-body"></tbody>
+      </table>
+    </div>
+    <div class="table-card">
+      <h3>Category Totals</h3>
+      <table id="cat-table">
+        <thead><tr><th>Category</th><th>Total</th></tr></thead>
+        <tbody id="cat-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const BASE = 'http://127.0.0.1:5000';
+let trendsChart = null;
+let categoryChart = null;
+
+function uid() { return document.getElementById('uid-input').value.trim(); }
+
+function showError(msg) {
+  const el = document.getElementById('error-bar');
+  el.style.display = msg ? 'block' : 'none';
+  el.textContent = msg;
+}
+
+function fmt(n) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+}
+
+async function apiFetch(path) {
+  const res = await fetch(BASE + path, {
+    headers: { 'Content-Type': 'application/json', 'X-User-Id': uid() }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function renderMetrics(summary) {
+  const net = summary.net_balance;
+  document.getElementById('metrics').innerHTML = `
+    <div class="metric-card">
+      <div class="metric-label">Total Income</div>
+      <div class="metric-value positive">${fmt(summary.total_income)}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Total Expenses</div>
+      <div class="metric-value negative">${fmt(summary.total_expense)}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Net Balance</div>
+      <div class="metric-value ${net >= 0 ? 'positive' : 'negative'}">${fmt(net)}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Categories</div>
+      <div class="metric-value neutral">${Object.keys(summary.category_totals).length}</div>
+    </div>
+  `;
+}
+
+function renderRecent(records) {
+  const tbody = document.getElementById('recent-body');
+  if (!records.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No records yet</td></tr>'; return; }
+  tbody.innerHTML = records.map(r => `
+    <tr>
+      <td>${r.date}</td>
+      <td>${r.category}</td>
+      <td><span class="pill ${r.type}">${r.type}</span></td>
+      <td>${fmt(r.amount)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderCategoryTotals(totals) {
+  const tbody = document.getElementById('cat-body');
+  const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) { tbody.innerHTML = '<tr><td colspan="2" class="empty">No data</td></tr>'; return; }
+  tbody.innerHTML = entries.map(([cat, amt]) => `
+    <tr><td>${cat}</td><td>${fmt(amt)}</td></tr>
+  `).join('');
+}
+
+function renderTrendsChart(monthly) {
+  const labels = Object.keys(monthly).sort();
+  const income  = labels.map(m => monthly[m].income  || 0);
+  const expense = labels.map(m => monthly[m].expense || 0);
+  if (trendsChart) trendsChart.destroy();
+  trendsChart = new Chart(document.getElementById('trends-chart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Income',  data: income,  backgroundColor: '#86efac', borderRadius: 4 },
+        { label: 'Expense', data: expense, backgroundColor: '#fca5a5', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { font: { family: 'sans-serif', size: 11 }, boxWidth: 12 } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { family: 'sans-serif', size: 10 } } },
+        y: { grid: { color: '#f0f0ed' }, ticks: { font: { family: 'sans-serif', size: 10 },
+          callback: v => '₹' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v) } }
+      }
+    }
+  });
+}
+
+function renderCategoryChart(totals) {
+  const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const palette = ['#86efac','#93c5fd','#fcd34d','#f9a8d4','#a5b4fc','#6ee7b7','#fca5a5','#c4b5fd'];
+  if (categoryChart) categoryChart.destroy();
+  categoryChart = new Chart(document.getElementById('category-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: entries.map(e => e[0]),
+      datasets: [{ data: entries.map(e => e[1]), backgroundColor: palette, borderWidth: 1, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { font: { family: 'sans-serif', size: 11 }, boxWidth: 12, padding: 10 } }
+      }
+    }
+  });
+}
+
+async function loadAll() {
+  if (!uid()) { showError('Paste your User ID (from ui.html → POST /users) in the field above.'); return; }
+  showError('');
+  document.getElementById('status-dot').className = 'status-dot';
+
+  try {
+    const [summary, trends] = await Promise.all([
+      apiFetch('/dashboard/summary'),
+      apiFetch('/dashboard/trends').catch(() => ({ monthly_trends: {} }))
+    ]);
+
+    document.getElementById('status-dot').className = 'status-dot online';
+    document.getElementById('charts-row').style.display = 'grid';
+    document.getElementById('bottom-row').style.display = 'grid';
+
+    renderMetrics(summary);
+    renderRecent(summary.recent_activity || []);
+    renderCategoryTotals(summary.category_totals || {});
+    renderTrendsChart(trends.monthly_trends || {});
+    renderCategoryChart(summary.category_totals || {});
+
+  } catch (e) {
+    document.getElementById('status-dot').className = 'status-dot';
+    const msg = e.message.includes('fetch') || e.message.includes('Failed')
+      ? 'Cannot reach server — make sure python app.py is running on port 5000.'
+      : e.message;
+    showError(msg);
+    document.getElementById('metrics').innerHTML = '<div class="loading">Failed to load data.</div>';
+  }
+}
+</script>
+</body>
+</html>
