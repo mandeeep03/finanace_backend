@@ -1,5 +1,4 @@
 from models.record import Record
-from extensions import db
 
 def get_active_records(type_filter=None, category_filter=None, date_filter=None):
     query = Record.query.filter_by(deleted=False)
@@ -13,16 +12,12 @@ def get_active_records(type_filter=None, category_filter=None, date_filter=None)
 
 def get_summary():
     records = Record.query.filter_by(deleted=False).all()
-
     total_income = sum(r.amount for r in records if r.type == "income")
     total_expense = sum(r.amount for r in records if r.type == "expense")
-
     category_totals = {}
     for r in records:
         category_totals[r.category] = category_totals.get(r.category, 0) + r.amount
-
     recent = sorted(records, key=lambda r: r.date, reverse=True)[:5]
-
     return {
         "total_income": round(total_income, 2),
         "total_expense": round(total_expense, 2),
